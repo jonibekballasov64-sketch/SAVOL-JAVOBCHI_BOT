@@ -2,20 +2,19 @@ const { MANDATORY_WAIT, SILENCE_WINDOW } = require('./config');
 const { isAnswerCorrect } = require('./quizParser');
 const db = require('./db');
 
-// chatId -> sessionState (xotirada)
 const activeSessions = new Map();
 
 const MOTIVATION_PHRASES = [
-  "Faolroq bo'laylik! 💪",
-  "Kim tezroq javob topadi? Harakat qiling! 🔥",
-  "Zo'r ketyapmiz, davom etamiz! ✨",
-  "Bilim — kuch! Keyingisiga o'tamiz 📚"
+  "Faolroq bo'laylik!",
+  "Kim tezroq javob topadi? Harakat qiling!",
+  "Zo'r ketyapmiz, davom etamiz!",
+  "Bilim - kuch! Keyingisiga o'tamiz"
 ];
 
 const START_PHRASES = [
-  "Boshladik! Diqqat bilan javob bering 🎯",
-  "E'tibor bilan o'qiymiz va javob yozamiz ✍️",
-  "Savol-javob boshlandi, omad! 🍀"
+  "Boshladik! Diqqat bilan javob bering",
+  "E'tibor bilan o'qiymiz va javob yozamiz",
+  "Savol-javob boshlandi, omad!"
 ];
 
 function randomFrom(arr) {
@@ -28,7 +27,7 @@ function sleep(ms) {
 
 async function startSession(bot, { chatId, groupId, topicId, questions, sessionId }) {
   if (activeSessions.has(chatId)) {
-    await bot.telegram.sendMessage(chatId, "⚠️ Bu guruhda allaqachon faol sessiya bor.");
+    await bot.telegram.sendMessage(chatId, "Bu guruhda allaqachon faol sessiya bor.");
     return;
   }
 
@@ -40,8 +39,8 @@ async function startSession(bot, { chatId, groupId, topicId, questions, sessionI
     questions,
     currentIndex: 0,
     lastMessageTime: Date.now(),
-    correctAnswerFound: false,
-    correctMessage: null,
+    correctUsers: [],
+    correctUserIds: new Set(),
     stopped: false
   };
 
@@ -49,8 +48,7 @@ async function startSession(bot, { chatId, groupId, topicId, questions, sessionI
 
   await bot.telegram.sendMessage(
     chatId,
-    `📖 *Savol-javob boshlanmoqda!*\n\n${randomFrom(START_PHRASES)}\n\nJami savollar: ${questions.length}`,
-    { parse_mode: 'Markdown' }
+    `Savol-javob boshlanmoqda!\n\n${randomFrom(START_PHRASES)}\n\nJami savollar: ${questions.length}`
   );
 
   await sleep(2000);
@@ -69,13 +67,12 @@ async function runQuestionLoop(bot, state) {
 
   state.lastMessageTime = Date.now();
   state.questionStartTime = Date.now();
-  state.correctAnswerFound = false;
-  state.correctMessage = null;
+  state.correctUsers = [];
+  state.correctUserIds = new Set();
 
   await bot.telegram.sendMessage(
     state.chatId,
-    `❓ *${state.currentIndex + 1}-savol:*\n\n${question.question_text}`,
-    { parse_mode: 'Markdown' }
+    `${state.currentIndex + 1}-savol:\n\n${question.question_text}`
   );
 
   await waitAndResolve(bot, state, question);
@@ -92,13 +89,8 @@ async function waitAndResolve(bot, state, question) {
 
     if (elapsedSinceStart < MANDATORY_WAIT) continue;
 
-    if (state.correctAnswerFound) {
-      await announceCorrectAnswer(bot, state, question);
-      break;
-    }
-
     if (elapsedSinceLastMsg >= SILENCE_WINDOW) {
-      await announceBotAnswer(bot, state, question);
+      await announceResults(bot, state, question);
       break;
     }
   }
@@ -110,42 +102,33 @@ async function waitAndResolve(bot, state, question) {
   runQuestionLoop(bot, state);
 }
 
-async function announceCorrectAnswer(bot, state, question) {
-  try {
-    await bot.telegram.forwardMessage(
+async function announceResults(bot, state, question) {
+  if (state.correctUsers.length > 0) {
+    const list = state.correctUsers
+      .map((u, i) => `${i + 1}. ${u.name}`)
+      .join('\n');
+
+    await bot.telegram.sendMessage(
       state.chatId,
-      state.chatId,
-      state.correctMessage.message_id
+      `🏆🏆🏆🏆🏆🏆🏆🏆\nTo'g'ri javob berganlar:\n\n${list}\n\n✅️ To'g'ri javob: ${question.answer_text}\n\n${randomFrom(MOTIVATION_PHRASES)}`
     );
-  } catch (err) {
-    console.error('Forward xato:', err.message);
-  }
 
-  await bot.telegram.sendMessage(
-    state.chatId,
-    `✅️ To'g'ri javob:\n\n${question.answer_text}`,
-    { parse_mode: 'Markdown' }
-  );
-
-  // to'g'ri javob berganni saqlab qo'yamiz
-  if (state.correctMessage) {
-    try {
-      await db.query(
-        'INSERT INTO correct_answers (session_id, question_id, user_id) VALUES ($1, $2, $3)',
-        [state.sessionId, question.id, state.correctMessage.from.id]
-      );
-    } catch (err) {
-      console.error('correct_answers saqlashda xato:', err.message);
+    for (const u of state.correctUsers) {
+      try {
+        await db.query(
+          'INSERT INTO correct_answers (session_id, question_id, user_id) VALUES ($1, $2, $3)',
+          [state.sessionId, question.id, u.id]
+        );
+      } catch (err) {
+        console.error('correct_answers saqlashda xato:', err.message);
+      }
     }
+  } else {
+    await bot.telegram.sendMessage(
+      state.chatId,
+      `⏱ Vaqt tugadi.\n\n✅️ To'g'ri javob: ${question.answer_text}\n\n${randomFrom(MOTIVATION_PHRASES)}`
+    );
   }
-}
-
-async function announceBotAnswer(bot, state, question) {
-  await bot.telegram.sendMessage(
-    state.chatId,
-    `⏱ Vaqt tugadi.\n\n✅️ To'g'ri javob:\n${question.answer_text}\n\n${randomFrom(MOTIVATION_PHRASES)}`,
-    { parse_mode: 'Markdown' }
-  );
 }
 
 async function finishSession(bot, state) {
@@ -156,6 +139,19 @@ async function finishSession(bot, state) {
     [state.sessionId]
   );
 
+  // 1) Barcha savol-javoblarni qayta post qilish
+  let recap = `📋 Barcha savol-javoblar (${state.questions.length} ta):\n\n`;
+  state.questions.forEach((q, i) => {
+    recap += `${i + 1}. ${q.question_text}\n➡️ ${q.answer_text}\n\n`;
+  });
+
+  const chunks = splitMessage(recap, 3800);
+  for (const chunk of chunks) {
+    await bot.telegram.sendMessage(state.chatId, chunk);
+    await sleep(500);
+  }
+
+  // 2) Faollik statistikasi
   const activityResult = await db.query(
     `SELECT full_name, username, message_count
      FROM session_activity
@@ -168,18 +164,39 @@ async function finishSession(bot, state) {
   let leaderboard = '';
   activityResult.rows.forEach((row, i) => {
     const name = row.full_name || row.username || 'Foydalanuvchi';
-    leaderboard += `${i + 1}. ${name} — ${row.message_count} ta xabar\n`;
+    leaderboard += `${i + 1}. ${name} - ${row.message_count} ta xabar\n`;
   });
 
   await bot.telegram.sendMessage(
     state.chatId,
-    `🎉 *Savol-javob yakunlandi!*\n\nBarchaga faol ishtirok uchun rahmat! 🙌\n\n` +
-    `*Eng faol ishtirokchilar:*\n${leaderboard || 'Ma\'lumot topilmadi'}`,
-    { parse_mode: 'Markdown' }
+    `Eng faol ishtirokchilar:\n${leaderboard || "Ma'lumot topilmadi"}`
+  );
+
+  // 3) Yakuniy motivatsion xabar
+  await sleep(1000);
+  await bot.telegram.sendMessage(
+    state.chatId,
+    `Savol-javob yakunlandi! Barchaga faol ishtirok uchun rahmat 🙌\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚`
   );
 }
 
-// Guruhdagi har bir xabarni sessiyaga uzatish uchun chaqiriladi
+function splitMessage(text, maxLen) {
+  const chunks = [];
+  let current = '';
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    if ((current + line + '\n').length > maxLen) {
+      chunks.push(current);
+      current = '';
+    }
+    current += line + '\n';
+  }
+  if (current.trim()) chunks.push(current);
+
+  return chunks;
+}
+
 async function handleGroupMessage(ctx) {
   const chatId = ctx.chat.id;
   const state = activeSessions.get(chatId);
@@ -190,7 +207,6 @@ async function handleGroupMessage(ctx) {
 
   state.lastMessageTime = Date.now();
 
-  // Faollikni yangilash (upsert)
   const userId = msg.from.id;
   const fullName = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ');
   const username = msg.from.username || null;
@@ -209,12 +225,11 @@ async function handleGroupMessage(ctx) {
     console.error('Faollik yangilashda xato:', err.message);
   }
 
-  // To'g'ri javobni tekshirish (birinchi topilgan to'g'ri javob qabul qilinadi)
-  if (!state.correctAnswerFound) {
-    const question = state.questions[state.currentIndex];
-    if (question && isAnswerCorrect(msg.text, question.answer_text)) {
-      state.correctAnswerFound = true;
-      state.correctMessage = msg;
+  const question = state.questions[state.currentIndex];
+  if (question && isAnswerCorrect(msg.text, question.answer_text)) {
+    if (!state.correctUserIds.has(userId)) {
+      state.correctUserIds.add(userId);
+      state.correctUsers.push({ id: userId, name: fullName || username || 'Foydalanuvchi' });
     }
   }
 }
