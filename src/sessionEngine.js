@@ -17,12 +17,25 @@ const START_PHRASES = [
   "Savol-javob boshlandi, omad!"
 ];
 
+const QUESTION_SEPARATOR = '⁉️'.repeat(11);
+
 function randomFrom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+async function sendHtml(bot, chatId, text) {
+  await bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' });
 }
 
 async function startSession(bot, { chatId, groupId, topicId, questions, sessionId }) {
@@ -46,9 +59,10 @@ async function startSession(bot, { chatId, groupId, topicId, questions, sessionI
 
   activeSessions.set(chatId, state);
 
-  await bot.telegram.sendMessage(
+  await sendHtml(
+    bot,
     chatId,
-    `Savol-javob boshlanmoqda!\n\n${randomFrom(START_PHRASES)}\n\nJami savollar: ${questions.length}`
+    `<b>Savol-javob boshlanmoqda!</b>\n\n${randomFrom(START_PHRASES)}\n\nJami savollar: ${questions.length}`
   );
 
   await sleep(2000);
@@ -70,10 +84,8 @@ async function runQuestionLoop(bot, state) {
   state.correctUsers = [];
   state.correctUserIds = new Set();
 
-  await bot.telegram.sendMessage(
-    state.chatId,
-    `${state.currentIndex + 1}-savol:\n\n${question.question_text}`
-  );
+  const text = `${QUESTION_SEPARATOR}\n<b>${state.currentIndex + 1}-savol:</b>\n\n${escapeHtml(question.question_text)}`;
+  await sendHtml(bot, state.chatId, text);
 
   await waitAndResolve(bot, state, question);
 }
@@ -105,13 +117,11 @@ async function waitAndResolve(bot, state, question) {
 async function announceResults(bot, state, question) {
   if (state.correctUsers.length > 0) {
     const list = state.correctUsers
-      .map((u, i) => `${i + 1}. ${u.name}`)
+      .map((u, i) => `${i + 1}. <b>${escapeHtml(u.name)}</b>`)
       .join('\n');
 
-    await bot.telegram.sendMessage(
-      state.chatId,
-      `🏆🏆🏆🏆🏆🏆🏆🏆\nTo'g'ri javob berganlar:\n\n${list}\n\n✅️ To'g'ri javob: ${question.answer_text}\n\n${randomFrom(MOTIVATION_PHRASES)}`
-    );
+    const text = `🏆🏆🏆🏆🏆🏆🏆🏆\n<b>To'g'ri javob berganlar:</b>\n\n${list}\n\n✅️ <b>To'g'ri javob:</b> ${escapeHtml(question.answer_text)}\n\n${randomFrom(MOTIVATION_PHRASES)}`;
+    await sendHtml(bot, state.chatId, text);
 
     for (const u of state.correctUsers) {
       try {
@@ -124,10 +134,8 @@ async function announceResults(bot, state, question) {
       }
     }
   } else {
-    await bot.telegram.sendMessage(
-      state.chatId,
-      `⏱ Vaqt tugadi.\n\n✅️ To'g'ri javob: ${question.answer_text}\n\n${randomFrom(MOTIVATION_PHRASES)}`
-    );
+    const text = `⏱ Vaqt tugadi.\n\n✅️ <b>To'g'ri javob:</b> ${escapeHtml(question.answer_text)}\n\n${randomFrom(MOTIVATION_PHRASES)}`;
+    await sendHtml(bot, state.chatId, text);
   }
 }
 
@@ -139,15 +147,15 @@ async function finishSession(bot, state) {
     [state.sessionId]
   );
 
-  // 1) Barcha savol-javoblarni qayta post qilish
-  let recap = `📋 Barcha savol-javoblar (${state.questions.length} ta):\n\n`;
-  state.questions.forEach((q, i) => {
-    recap += `${i + 1}. ${q.question_text}\n➡️ ${q.answer_text}\n\n`;
+  // 1) Barcha savol-javoblarni ⁉️ ✅️ formatda qayta post qilish
+  let recap = `📋 <b>Barcha savol-javoblar (${state.questions.length} ta):</b>\n\n`;
+  state.questions.forEach((q) => {
+    recap += `⁉️ ${escapeHtml(q.question_text)}\n✅️ <b>${escapeHtml(q.answer_text)}</b>\n\n`;
   });
 
   const chunks = splitMessage(recap, 3800);
   for (const chunk of chunks) {
-    await bot.telegram.sendMessage(state.chatId, chunk);
+    await sendHtml(bot, state.chatId, chunk);
     await sleep(500);
   }
 
@@ -164,19 +172,21 @@ async function finishSession(bot, state) {
   let leaderboard = '';
   activityResult.rows.forEach((row, i) => {
     const name = row.full_name || row.username || 'Foydalanuvchi';
-    leaderboard += `${i + 1}. ${name} - ${row.message_count} ta xabar\n`;
+    leaderboard += `${i + 1}. <b>${escapeHtml(name)}</b> - ${row.message_count} ta xabar\n`;
   });
 
-  await bot.telegram.sendMessage(
+  await sendHtml(
+    bot,
     state.chatId,
-    `Eng faol ishtirokchilar:\n${leaderboard || "Ma'lumot topilmadi"}`
+    `<b>Eng faol ishtirokchilar:</b>\n${leaderboard || "Ma'lumot topilmadi"}`
   );
 
   // 3) Yakuniy motivatsion xabar
   await sleep(1000);
-  await bot.telegram.sendMessage(
+  await sendHtml(
+    bot,
     state.chatId,
-    `Savol-javob yakunlandi! Barchaga faol ishtirok uchun rahmat 🙌\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚`
+    `<b>Savol-javob yakunlandi!</b> Barchaga faol ishtirok uchun rahmat 🙌\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚`
   );
 }
 
