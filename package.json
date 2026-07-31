@@ -1,0 +1,17 @@
+{
+  "name": "telegram-quiz-bot",
+  "version": "1.0.0",
+  "description": "Badiiy asar savol-javob Telegram bot",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "pg": "^8.12.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
