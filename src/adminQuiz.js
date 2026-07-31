@@ -15,11 +15,10 @@ function registerAdminQuizHandlers(bot) {
 
     await ctx.reply(
       "Mavzu ma'lumotini yuboring quyidagi formatda:\n\n" +
-      "`slug | Mavzu nomi`\n\n" +
+      "slug | Mavzu nomi\n\n" +
       "Masalan:\n" +
-      "`5-sinf1-qism | 5-sinf 1-qism savollari`\n\n" +
-      "_(slug — guruhda /start_ buyrug'ida ishlatiladigan qism, faqat harf/raqam/tire)_",
-      { parse_mode: 'Markdown' }
+      "5-sinf1-qism | 5-sinf 1-qism savollari\n\n" +
+      "(slug - guruhda start buyrug'ida ishlatiladigan qism, faqat harf, raqam va tiredan iborat bo'lishi kerak)"
     );
   });
 
@@ -67,7 +66,7 @@ function registerAdminQuizHandlers(bot) {
 
   // "Davom etish" tugmasi — shunchaki klaviaturani yopadi
   bot.action('quiz_continue', async (ctx) => {
-    await ctx.answerCbQuery('Davom eting, keyingi savollarni yuboring ✍️');
+    await ctx.answerCbQuery('Davom eting, keyingi savollarni yuboring');
   });
 }
 
@@ -76,8 +75,7 @@ async function handleMeta(ctx, state, text) {
 
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     await ctx.reply(
-      "Format noto'g'ri. Iltimos qayta yuboring:\n`slug | Mavzu nomi`",
-      { parse_mode: 'Markdown' }
+      "Format noto'g'ri. Iltimos qayta yuboring:\nslug | Mavzu nomi"
     );
     return;
   }
@@ -104,11 +102,10 @@ async function handleMeta(ctx, state, text) {
   state.stage = 'awaiting_questions';
 
   await ctx.reply(
-    `Mavzu: *${title}* (${slug})\n\n` +
+    `Mavzu: ${title} (${slug})\n\n` +
     "Endi savol-javoblarni yuboring. Formatda:\n" +
     "⁉️ Savol matni\n✅️ Javob matni\n\n" +
-    "Bir nechta savolni birdan, yoki bo'lib-bo'lib yuborishingiz mumkin.",
-    { parse_mode: 'Markdown' }
+    "Bir nechta savolni birdan, yoki bo'lib-bo'lib yuborishingiz mumkin."
   );
 }
 
@@ -126,14 +123,13 @@ async function handleQuestionsChunk(ctx, state, text) {
   state.buffer.push(...pairs);
 
   await ctx.reply(
-    `✅ Shu mavzuda hozircha *${state.buffer.length} ta* savol-javob qabul qilindi.`,
+    `Shu mavzuda hozircha ${state.buffer.length} ta savol-javob qabul qilindi.`,
     {
-      parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '➕ Davom etish', callback_data: 'quiz_continue' },
-            { text: '💾 Yakunlash va saqlash', callback_data: 'quiz_finish' }
+            { text: 'Davom etish', callback_data: 'quiz_continue' },
+            { text: 'Yakunlash va saqlash', callback_data: 'quiz_finish' }
           ]
         ]
       }
@@ -163,17 +159,16 @@ async function saveTopicToDb(ctx, state) {
     await client.query('COMMIT');
 
     await ctx.editMessageText(
-      `✅ Saqlandi!\n\n` +
-      `Mavzu: *${state.title}*\n` +
-      `Slug: \`${state.slug}\`\n` +
-      `Savollar soni: *${state.buffer.length}*\n\n` +
-      `Guruhda boshlash uchun:\n\`/start_${state.slug}\``,
-      { parse_mode: 'Markdown' }
+      `Saqlandi!\n\n` +
+      `Mavzu: ${state.title}\n` +
+      `Slug: ${state.slug}\n` +
+      `Savollar soni: ${state.buffer.length}\n\n` +
+      `Guruhda boshlash uchun:\n/start_${state.slug}`
     );
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Saqlashda xatolik:', err);
-    await ctx.reply("❌ Saqlashda xatolik yuz berdi. Qaytadan urinib ko'ring.");
+    await ctx.reply("Saqlashda xatolik yuz berdi. Qaytadan urinib ko'ring.");
   } finally {
     client.release();
   }
