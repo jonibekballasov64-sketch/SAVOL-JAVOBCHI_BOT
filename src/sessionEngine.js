@@ -54,8 +54,7 @@ async function startSession(bot, { chatId, groupId, topicId, questions, sessionI
     lastMessageTime: Date.now(),
     correctUsers: [],
     correctUserIds: new Set(),
-    stopped: false,
-    manuallyStopped: false
+    stopped: false
   };
 
   activeSessions.set(chatId, state);
@@ -140,18 +139,16 @@ async function announceResults(bot, state, question) {
   }
 }
 
-// Savollar tugagach avtomatik chaqiriladi
+// Savollar tabiiy tugagach avtomatik chaqiriladi
 async function finishSession(bot, state) {
   activeSessions.delete(state.chatId);
   await sendRecapAndStats(bot, state, state.questions, false);
 }
 
-// /toxtat bosilganda chaqiriladi — faqat shu vaqtgacha berilgan savollar recap qilinadi
+// /toxtat bosilganda chaqiriladi — mavzudagi BARCHA savol-javoblar to'liq chiqariladi
 async function finishSessionManually(bot, state) {
   activeSessions.delete(state.chatId);
-  // hozirgi savol hali yakunlanmagan bo'lishi mumkin, shuning uchun currentIndex gacha bo'lganlarini olamiz
-  const askedQuestions = state.questions.slice(0, state.currentIndex + 1);
-  await sendRecapAndStats(bot, state, askedQuestions, true);
+  await sendRecapAndStats(bot, state, state.questions, true);
 }
 
 async function sendRecapAndStats(bot, state, questionsToRecap, wasStoppedManually) {
@@ -160,8 +157,8 @@ async function sendRecapAndStats(bot, state, questionsToRecap, wasStoppedManuall
     [state.sessionId]
   );
 
-  // 1) Berilgan savol-javoblarni ⁉️ ✅️ formatda qayta post qilish
-  let recap = `📋 <b>Savol-javoblar (${questionsToRecap.length} ta):</b>\n\n`;
+  // 1) Barcha savol-javoblarni ⁉️ ✅️ formatda qayta post qilish
+  let recap = `📋 <b>Barcha savol-javoblar (${questionsToRecap.length} ta):</b>\n\n`;
   questionsToRecap.forEach((q) => {
     recap += `⁉️ ${escapeHtml(q.question_text)}\n✅️ <b>${escapeHtml(q.answer_text)}</b>\n\n`;
   });
@@ -256,7 +253,7 @@ async function handleGroupMessage(ctx) {
   }
 }
 
-// Endi bu funksiya async, chunki recap+statistika yuborishi kerak
+// /toxtat bosilganda chaqiriladi
 async function stopSession(bot, chatId) {
   const state = activeSessions.get(chatId);
   if (!state) return false;
