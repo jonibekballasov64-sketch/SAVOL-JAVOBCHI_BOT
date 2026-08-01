@@ -54,7 +54,8 @@ async function startSession(bot, { chatId, groupId, topicId, questions, sessionI
     lastMessageTime: Date.now(),
     correctUsers: [],
     correctUserIds: new Set(),
-    stopped: false
+    stopped: false,
+    manuallyStopped: false
   };
 
   activeSessions.set(chatId, state);
@@ -139,17 +140,29 @@ async function announceResults(bot, state, question) {
   }
 }
 
+// Savollar tugagach avtomatik chaqiriladi
 async function finishSession(bot, state) {
   activeSessions.delete(state.chatId);
+  await sendRecapAndStats(bot, state, state.questions, false);
+}
 
+// /toxtat bosilganda chaqiriladi — faqat shu vaqtgacha berilgan savollar recap qilinadi
+async function finishSessionManually(bot, state) {
+  activeSessions.delete(state.chatId);
+  // hozirgi savol hali yakunlanmagan bo'lishi mumkin, shuning uchun currentIndex gacha bo'lganlarini olamiz
+  const askedQuestions = state.questions.slice(0, state.currentIndex + 1);
+  await sendRecapAndStats(bot, state, askedQuestions, true);
+}
+
+async function sendRecapAndStats(bot, state, questionsToRecap, wasStoppedManually) {
   await db.query(
     "UPDATE sessions SET status = 'finished', finished_at = NOW() WHERE id = $1",
     [state.sessionId]
   );
 
-  // 1) Barcha savol-javoblarni ⁉️ ✅️ formatda qayta post qilish
-  let recap = `📋 <b>Barcha savol-javoblar (${state.questions.length} ta):</b>\n\n`;
-  state.questions.forEach((q) => {
+  // 1) Berilgan savol-javoblarni ⁉️ ✅️ formatda qayta post qilish
+  let recap = `📋 <b>Savol-javoblar (${questionsToRecap.length} ta):</b>\n\n`;
+  questionsToRecap.forEach((q) => {
     recap += `⁉️ ${escapeHtml(q.question_text)}\n✅️ <b>${escapeHtml(q.answer_text)}</b>\n\n`;
   });
 
@@ -183,11 +196,10 @@ async function finishSession(bot, state) {
 
   // 3) Yakuniy motivatsion xabar
   await sleep(1000);
-  await sendHtml(
-    bot,
-    state.chatId,
-    `<b>Savol-javob yakunlandi!</b> Barchaga faol ishtirok uchun rahmat 🙌\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚`
-  );
+  const finishText = wasStoppedManually
+    ? `<b>Savol-javob to'xtatildi.</b> Barchaga faol ishtirok uchun rahmat 🙌\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚`
+    : `<b>Savol-javob yakunlandi!</b> Barchaga faol ishtirok uchun rahmat 🙌\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚`;
+  await sendHtml(bot, state.chatId, finishText);
 }
 
 function splitMessage(text, maxLen) {
@@ -244,12 +256,14 @@ async function handleGroupMessage(ctx) {
   }
 }
 
-function stopSession(chatId) {
+// Endi bu funksiya async, chunki recap+statistika yuborishi kerak
+async function stopSession(bot, chatId) {
   const state = activeSessions.get(chatId);
-  if (state) {
-    state.stopped = true;
-    activeSessions.delete(chatId);
-  }
+  if (!state) return false;
+
+  state.stopped = true;
+  await finishSessionManually(bot, state);
+  return true;
 }
 
 function hasActiveSession(chatId) {
