@@ -1,4 +1,4 @@
-const { isAdmin } = require('./config');
+const { isAdmin, getTimingSeconds, setTiming } = require('./config');
 const db = require('./db');
 const { startSession, handleGroupMessage, stopSession, hasActiveSession } = require('./sessionEngine');
 
@@ -32,7 +32,6 @@ function registerGroupHandlers(bot) {
       return;
     }
 
-    // Bot shu guruhda admin ekanligini tekshirish
     let botMember;
     try {
       botMember = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
@@ -102,6 +101,55 @@ function registerGroupHandlers(bot) {
     }
 
     await stopSession(bot, ctx.chat.id);
+  });
+
+  // /vaqt — kutish vaqtlarini ko'rish yoki o'zgartirish (faqat admin)
+  // Ishlatish: /vaqt              -> hozirgi qiymatlarni ko'rsatadi
+  //            /vaqt 7            -> faqat jimlik oynasini (7 soniya) o'zgartiradi
+  //            /vaqt 20 10        -> majburiy kutish 20s, jimlik oynasi 10s qilib o'zgartiradi
+  bot.command('vaqt', async (ctx) => {
+    if (!isAdmin(ctx.from.id)) return;
+
+    const parts = ctx.message.text.trim().split(/\s+/).slice(1);
+
+    if (parts.length === 0) {
+      const current = getTimingSeconds();
+      await ctx.reply(
+        `Hozirgi sozlamalar:\n\n` +
+        `Majburiy kutish: ${current.mandatory} soniya\n` +
+        `Jimlik oynasi: ${current.silence} soniya\n\n` +
+        `O'zgartirish uchun:\n` +
+        `/vaqt <jimlik_soniya> - faqat jimlik oynasini o'zgartiradi\n` +
+        `/vaqt <majburiy_soniya> <jimlik_soniya> - ikkalasini ham o'zgartiradi`
+      );
+      return;
+    }
+
+    let mandatory = null;
+    let silence = null;
+
+    if (parts.length === 1) {
+      silence = parseInt(parts[0], 10);
+    } else {
+      mandatory = parseInt(parts[0], 10);
+      silence = parseInt(parts[1], 10);
+    }
+
+    if ((mandatory !== null && (isNaN(mandatory) || mandatory < 1)) ||
+        (silence !== null && (isNaN(silence) || silence < 1))) {
+      await ctx.reply("Noto'g'ri qiymat. Faqat musbat butun son kiriting.\n\nMasalan: /vaqt 10  yoki  /vaqt 20 10");
+      return;
+    }
+
+    setTiming(mandatory, silence);
+    const updated = getTimingSeconds();
+
+    await ctx.reply(
+      `✅ Sozlamalar yangilandi:\n\n` +
+      `Majburiy kutish: ${updated.mandatory} soniya\n` +
+      `Jimlik oynasi: ${updated.silence} soniya\n\n` +
+      `Bu o'zgarish darhol kuchga kiradi (ketayotgan sessiyada ham).`
+    );
   });
 
   // Guruhdagi barcha xabarlarni sessiya motoriga uzatish
