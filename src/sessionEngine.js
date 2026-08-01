@@ -169,33 +169,43 @@ async function sendRecapAndStats(bot, state, questionsToRecap, wasStoppedManuall
     await sleep(500);
   }
 
-  // 2) Faollik statistikasi
+  // 2) Faollik statistikasi (cheklovsiz, sessiyada yozgan hamma kishi)
   const activityResult = await db.query(
     `SELECT full_name, username, message_count
      FROM session_activity
      WHERE session_id = $1
-     ORDER BY message_count DESC
-     LIMIT 20`,
+     ORDER BY message_count DESC`,
     [state.sessionId]
   );
+
+  const medals = ['🥇', '🥈', '🥉'];
 
   let leaderboard = '';
   activityResult.rows.forEach((row, i) => {
     const name = row.full_name || row.username || 'Foydalanuvchi';
-    leaderboard += `${i + 1}. <b>${escapeHtml(name)}</b> - ${row.message_count} ta xabar\n`;
+    const prefix = medals[i] || `${i + 1}.`;
+    leaderboard += `${prefix} <b>${escapeHtml(name)}</b> - ${row.message_count} ta xabar\n`;
   });
 
-  await sendHtml(
-    bot,
-    state.chatId,
-    `<b>Eng faol ishtirokchilar:</b>\n${leaderboard || "Ma'lumot topilmadi"}`
+  const statsIntro = `🎉🎊 <b>FAOLLAR REYTINGI</b> 🎊🎉\n\n👏👏👏 Barchaga katta olqish! 👏👏👏\n\n`;
+  const statsOutro = activityResult.rows.length > 0
+    ? `\n🔥 Ayniqsa top uchlik uchun qarsaklar! 🔥\n✨ Zo'r natija, davom eting! ✨`
+    : '';
+
+  const statsChunks = splitMessage(
+    statsIntro + (leaderboard || "Ma'lumot topilmadi") + statsOutro,
+    3800
   );
+  for (const chunk of statsChunks) {
+    await sendHtml(bot, state.chatId, chunk);
+    await sleep(500);
+  }
 
   // 3) Yakuniy motivatsion xabar
   await sleep(1000);
   const finishText = wasStoppedManually
-    ? `<b>Savol-javob to'xtatildi.</b> Barchaga faol ishtirok uchun rahmat 🙌\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚`
-    : `<b>Savol-javob yakunlandi!</b> Barchaga faol ishtirok uchun rahmat 🙌\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚`;
+    ? `🎈 <b>Savol-javob to'xtatildi.</b> 🎈\n\nBarchaga faol ishtirok uchun katta rahmat! 🙌🌟\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚✨`
+    : `🎈 <b>Savol-javob muvaffaqiyatli yakunlandi!</b> 🎈\n\nBarchaga faol ishtirok uchun katta rahmat! 🙌🌟\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚✨`;
   await sendHtml(bot, state.chatId, finishText);
 }
 
