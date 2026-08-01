@@ -101,8 +101,7 @@ function registerGroupHandlers(bot) {
       return;
     }
 
-    stopSession(ctx.chat.id);
-    await ctx.reply('⏹ Sessiya to\'xtatildi.');
+    await stopSession(bot, ctx.chat.id);
   });
 
   // Guruhdagi barcha xabarlarni sessiya motoriga uzatish
