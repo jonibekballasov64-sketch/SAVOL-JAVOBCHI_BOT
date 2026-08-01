@@ -1,4 +1,4 @@
-const { MANDATORY_WAIT, SILENCE_WINDOW } = require('./config');
+const { getMandatoryWait, getSilenceWindow } = require('./config');
 const { isAnswerCorrect } = require('./quizParser');
 const db = require('./db');
 
@@ -34,8 +34,6 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;');
 }
 
-// Xatolikka chidamli xabar yuborish - muvaffaqiyatsiz bo'lsa jarayonni yiqitmaydi,
-// faqat log qiladi va bir marta qayta urinib ko'radi
 async function sendHtml(bot, chatId, text) {
   try {
     await bot.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' });
@@ -50,7 +48,6 @@ async function sendHtml(bot, chatId, text) {
   }
 }
 
-// Xatolikka chidamli baza so'rovi - muvaffaqiyatsiz bo'lsa jarayonni yiqitmaydi
 async function safeDbQuery(text, params) {
   try {
     return await db.query(text, params);
@@ -113,7 +110,6 @@ async function runQuestionLoop(bot, state) {
     await waitAndResolve(bot, state, question);
   } catch (err) {
     console.error('runQuestionLoop xatolik:', err.message);
-    // Xatolik bo'lsa ham keyingi savolga o'tishga harakat qilamiz, sessiya to'xtab qolmasin
     if (!state.stopped) {
       state.currentIndex++;
       await sleep(1500);
@@ -132,9 +128,9 @@ async function waitAndResolve(bot, state, question) {
       const elapsedSinceStart = Date.now() - state.questionStartTime;
       const elapsedSinceLastMsg = Date.now() - state.lastMessageTime;
 
-      if (elapsedSinceStart < MANDATORY_WAIT) continue;
+      if (elapsedSinceStart < getMandatoryWait()) continue;
 
-      if (elapsedSinceLastMsg >= SILENCE_WINDOW) {
+      if (elapsedSinceLastMsg >= getSilenceWindow()) {
         await announceResults(bot, state, question);
         break;
       }
@@ -180,13 +176,11 @@ async function announceResults(bot, state, question) {
   }
 }
 
-// Savollar tabiiy tugagach avtomatik chaqiriladi
 async function finishSession(bot, state) {
   activeSessions.delete(state.chatId);
   await sendRecapAndStats(bot, state, state.questions, false);
 }
 
-// /toxtat bosilganda chaqiriladi — mavzudagi BARCHA savol-javoblar to'liq chiqariladi
 async function finishSessionManually(bot, state) {
   activeSessions.delete(state.chatId);
   await sendRecapAndStats(bot, state, state.questions, true);
@@ -199,7 +193,6 @@ async function sendRecapAndStats(bot, state, questionsToRecap, wasStoppedManuall
       [state.sessionId]
     );
 
-    // 1) Barcha savol-javoblarni ⁉️ ✅️ formatda qayta post qilish
     let recap = `📋 <b>Barcha savol-javoblar (${questionsToRecap.length} ta):</b>\n\n`;
     questionsToRecap.forEach((q) => {
       recap += `⁉️ ${escapeHtml(q.question_text)}\n✅️ <b>${escapeHtml(q.answer_text)}</b>\n\n`;
@@ -211,7 +204,6 @@ async function sendRecapAndStats(bot, state, questionsToRecap, wasStoppedManuall
       await sleep(500);
     }
 
-    // 2) Faollik statistikasi (cheklovsiz, sessiyada yozgan hamma kishi)
     const activityResult = await safeDbQuery(
       `SELECT full_name, username, message_count
        FROM session_activity
@@ -243,7 +235,6 @@ async function sendRecapAndStats(bot, state, questionsToRecap, wasStoppedManuall
       await sleep(500);
     }
 
-    // 3) Yakuniy motivatsion xabar
     await sleep(1000);
     const finishText = wasStoppedManually
       ? `🎈 <b>Savol-javob to'xtatildi.</b> 🎈\n\nBarchaga faol ishtirok uchun katta rahmat! 🙌🌟\n\nKeyingi darsga yanada kuchli tayyorlaning! 💪📚✨`
@@ -308,7 +299,6 @@ async function handleGroupMessage(ctx) {
   }
 }
 
-// /toxtat bosilganda chaqiriladi
 async function stopSession(bot, chatId) {
   const state = activeSessions.get(chatId);
   if (!state) return false;
