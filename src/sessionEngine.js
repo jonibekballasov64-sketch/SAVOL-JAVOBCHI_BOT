@@ -5,14 +5,14 @@ const db = require('./db');
 const activeSessions = new Map();
 
 const MOTIVATION_PHRASES = [
-  "Faolroq bo'laylik!",
-  "Kim tezroq javob topadi? Harakat qiling!",
-  "Zo'r ketyapmiz, davom etamiz!",
-  "Bilim - kuch! Keyingisiga o'tamiz"
+  "😊Faolroq bo'laylik!",
+  "😉Kim tezroq javob topadi? Harakat qiling!",
+  "👍Zo'r ketyapmiz, davom etamiz!",
+  "💪Bilim - kuch! Keyingisiga o'tamiz"
 ];
 
 const START_PHRASES = [
-  "Boshladik! Diqqat bilan javob bering",
+  "💥Boshladik! Diqqat bilan javob bering",
   "E'tibor bilan o'qiymiz va javob yozamiz",
   "Savol-javob boshlandi, omad!"
 ];
