@@ -29,6 +29,46 @@ function registerAdminQuizHandlers(bot) {
     await ctx.reply('Bekor qilindi.');
   });
 
+  // Barcha mavzular ro'yxati
+  bot.command('mavzular', async (ctx) => {
+    if (!isAdmin(ctx.from.id)) return;
+    if (ctx.chat.type !== 'private') return;
+
+    const result = await db.query(
+      `SELECT t.slug, t.title, COUNT(q.id) AS question_count
+       FROM topics t
+       LEFT JOIN questions q ON q.topic_id = t.id
+       GROUP BY t.id
+       ORDER BY t.created_at DESC`
+    );
+
+    if (result.rows.length === 0) {
+      await ctx.reply("Hozircha hech qanday mavzu qo'shilmagan.");
+      return;
+    }
+
+    let text = `Jami mavzular: ${result.rows.length} ta\n\n`;
+    result.rows.forEach((row, i) => {
+      text += `${i + 1}. ${row.title}\n   slug: ${row.slug}\n   savollar: ${row.question_count} ta\n\n`;
+    });
+
+    const maxLen = 3800;
+    if (text.length <= maxLen) {
+      await ctx.reply(text);
+    } else {
+      let current = '';
+      const lines = text.split('\n');
+      for (const line of lines) {
+        if ((current + line + '\n').length > maxLen) {
+          await ctx.reply(current);
+          current = '';
+        }
+        current += line + '\n';
+      }
+      if (current.trim()) await ctx.reply(current);
+    }
+  });
+
   // Matnli xabarlarni holatga qarab qayta ishlash
   bot.on('text', async (ctx, next) => {
     if (!isAdmin(ctx.from.id)) return next();
