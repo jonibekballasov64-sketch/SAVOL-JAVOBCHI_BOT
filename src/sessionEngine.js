@@ -4,11 +4,32 @@ const db = require('./db');
 
 const activeSessions = new Map();
 
-const MOTIVATION_PHRASES = [
-  "😊Faolroq bo'laylik!",
-  "😉Kim tezroq javob topadi? Harakat qiling!",
-  "👍Zo'r ketyapmiz, davom etamiz!",
-  "💪Bilim - kuch! Keyingisiga o'tamiz"
+// To'g'ri javob berilganda chiqadigan xabarlar - ko'tarinki, har xil
+const CORRECT_REACTIONS = [
+  "🎉 Zo'r! Barakalla! qolganlar ham harakat qiling💥",
+  "🔥 Ajoyib javob! MUtlaq to'g'ri",
+  "👏 Mukammal! Davom etamiz!",
+  "⭐ Zo'r natija! Yana oldinga!",
+  "💥 Bomba javob! Tabriklaymiz!",
+  "🚀 Zo'r sur'at! Shu ruhda davom etamiz!",
+  "🏅 Ajoyib bilim! Keyingisiga tayyor bo'ling!",
+  "🌟 Zo'r! Siz haqiqiy bilimdonsiz!",
+  "👍 Zo'r ketyapmiz, davom etamiz!",
+  "🔥 Zo'r! Yana shunday davom eting!"
+];
+
+// Vaqt tugaganda / xato javob bo'lganda chiqadigan xabarlar - harakatga chorlovchi
+const TIMEOUT_REACTIONS = [
+  "⏳ Vaqt tugadi, lekin harakat davom etsin!",
+  "💪 Hechqisi yo'q, keyingisida albatta topamiz!",
+  "🔥 Faolroq bo'laylik, harakat qiling!",
+  "🤔 Diqqat bilan o'ylab ko'raylik, davom etamiz!",
+  "📚 Bilimni mustahkamlaymiz, keyingi savolga o'tamiz!",
+  "🙌 Kurashni davom ettiramiz!",
+  "💡 Keyingi safar albatta topamiz!",
+  "😉 Kim tezroq javob topadi? Harakat qiling!",
+  "⚡ Diqqatni jamlaymiz, davom etamiz!",
+  "🎯 Nishonga aniqroq olamiz, keyingisiga!"
 ];
 
 const START_PHRASES = [
@@ -158,7 +179,7 @@ async function announceResults(bot, state, question) {
         .map((u, i) => `${i + 1}. <b>${escapeHtml(u.name)}</b>`)
         .join('\n');
 
-      const text = `🏆🏆🏆🏆🏆🏆🏆🏆\n<b>To'g'ri javob berganlar:</b>\n\n${list}\n\n✅️ <b>To'g'ri javob:</b> ${escapeHtml(question.answer_text)}\n\n${randomFrom(MOTIVATION_PHRASES)}`;
+      const text = `🏆🏆🏆🏆🏆🏆🏆🏆\n<b>To'g'ri javob berganlar:</b>\n\n${list}\n\n✅️ <b>To'g'ri javob:</b> ${escapeHtml(question.answer_text)}\n\n${randomFrom(CORRECT_REACTIONS)}`;
       await sendHtml(bot, state.chatId, text);
 
       for (const u of state.correctUsers) {
@@ -168,7 +189,7 @@ async function announceResults(bot, state, question) {
         );
       }
     } else {
-      const text = `⏱ Vaqt tugadi.\n\n✅️ <b>To'g'ri javob:</b> ${escapeHtml(question.answer_text)}\n\n${randomFrom(MOTIVATION_PHRASES)}`;
+      const text = `⏱ Vaqt tugadi.\n\n✅️ <b>To'g'ri javob:</b> ${escapeHtml(question.answer_text)}\n\n${randomFrom(TIMEOUT_REACTIONS)}`;
       await sendHtml(bot, state.chatId, text);
     }
   } catch (err) {
