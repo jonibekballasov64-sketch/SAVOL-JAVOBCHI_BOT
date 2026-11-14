@@ -4,6 +4,8 @@ const { BOT_TOKEN } = require('./config');
 const db = require('./db');
 const { registerAdminQuizHandlers } = require('./adminQuiz');
 const { registerGroupHandlers } = require('./groupCommands');
+const { registerQueueAdminHandlers } = require('./queueAdmin');
+const { checkSchedule } = require('./queueRunner');
 
 if (!BOT_TOKEN) {
   console.error('❌ BOT_TOKEN topilmadi. .env faylni tekshiring.');
@@ -17,13 +19,19 @@ async function main() {
 
   registerAdminQuizHandlers(bot);
   registerGroupHandlers(bot);
+  registerQueueAdminHandlers(bot);
+
+  // Rejalashtirilgan (/rejalashtir) navbatlarni har 15 soniyada tekshirib,
+  // vaqti kelganlarini avtomatik boshlaydi.
+  setInterval(() => checkSchedule(bot), 15000);
 
   bot.command('start', async (ctx) => {
     if (ctx.chat.type === 'private') {
       await ctx.reply(
         "Salom! Bu savol-javob bot.\n\n" +
         "Yangi mavzu qo'shish uchun: /yangi_mavzu\n" +
-        "Guruhda boshlash uchun: /start_<mavzu_slug>"
+        "Guruhda bitta mavzuni boshlash uchun: /start_<mavzu_slug>\n" +
+        "Guruhda bir nechta mavzuni navbat bilan (taymerli) boshlash uchun: /rejalashtir"
       );
     }
   });
