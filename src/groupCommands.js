@@ -101,6 +101,13 @@ function registerGroupHandlers(bot) {
     }
 
     await stopSession(bot, ctx.chat.id);
+
+    // Qo'lda to'xtatilganda /rejalashtir orqali tuzilgan navbat ham to'xtaydi
+    // (keyingi mavzular o'zi davom etmaydi) - admin xohlasa /rejalashtir bilan qaytadan tuzadi.
+    await db.query(
+      "UPDATE topic_queue SET status='cancelled' WHERE chat_id=$1 AND status IN ('started','pending')",
+      [ctx.chat.id]
+    );
   });
 
   // /vaqt — kutish vaqtlarini ko'rish yoki o'zgartirish (faqat admin)

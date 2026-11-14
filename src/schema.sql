@@ -53,3 +53,19 @@ CREATE TABLE IF NOT EXISTS correct_answers (
   user_id BIGINT NOT NULL,
   answered_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Guruh uchun rejalashtirilgan mavzular navbati (/rejalashtir)
+-- position=1 bo'lgan yozuvda scheduled_at to'ldirilsa, shu vaqt kelganda scheduler
+-- avtomatik boshlaydi; keyingi positionlar oldingisi tabiiy tugagach zanjir bo'ylab
+-- avtomatik ishga tushadi (scheduled_at ularda NULL).
+CREATE TABLE IF NOT EXISTS topic_queue (
+  id SERIAL PRIMARY KEY,
+  chat_id BIGINT NOT NULL,
+  topic_id INTEGER NOT NULL REFERENCES topics(id),
+  position INTEGER NOT NULL,
+  scheduled_at TIMESTAMPTZ,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending | started | done | cancelled | error
+  created_by BIGINT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_topic_queue_chat_status ON topic_queue(chat_id, status);

@@ -78,7 +78,7 @@ async function safeDbQuery(text, params) {
   }
 }
 
-async function startSession(bot, { chatId, groupId, topicId, questions, sessionId }) {
+async function startSession(bot, { chatId, groupId, topicId, questions, sessionId, queueItemId }) {
   if (activeSessions.has(chatId)) {
     await sendHtml(bot, chatId, "Bu guruhda allaqachon faol sessiya bor.");
     return;
@@ -94,7 +94,8 @@ async function startSession(bot, { chatId, groupId, topicId, questions, sessionI
     lastMessageTime: Date.now(),
     correctUsers: [],
     correctUserIds: new Set(),
-    stopped: false
+    stopped: false,
+    queueItemId: queueItemId || null
   };
 
   activeSessions.set(chatId, state);
@@ -200,6 +201,13 @@ async function announceResults(bot, state, question) {
 async function finishSession(bot, state) {
   activeSessions.delete(state.chatId);
   await sendRecapAndStats(bot, state, state.questions, false);
+
+  // Navbatdan (/rejalashtir) boshlangan mavzu tabiiy tugadi - keyingisi bo'lsa, o'zi davom etadi.
+  // Qo'lda /toxtat bilan to'xtatilganda bu yerga kelinmaydi (finishSessionManually chaqiriladi).
+  if (state.queueItemId) {
+    const { tryAdvanceQueue } = require('./queueRunner');
+    await tryAdvanceQueue(bot, state.chatId, state.queueItemId);
+  }
 }
 
 async function finishSessionManually(bot, state) {
