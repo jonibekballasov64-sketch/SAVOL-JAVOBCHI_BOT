@@ -16,6 +16,14 @@ async function startQueueItem(bot, queueItemId) {
   if (claimRes.rows.length === 0) return false; // allaqachon boshqa joyda ushlangan/bekor qilingan
   const queueItem = claimRes.rows[0];
 
+  // MUHIM: pg kutubxonasi BIGINT ustunlarni (chat_id shular jumlasidan) JS
+  // "string" sifatida qaytaradi, "number" emas. Agar shu qiymat to'g'ridan-to'g'ri
+  // activeSessions Map kalitiga yoki keyingi solishtirishlarga ishlatilsa, u
+  // Telegraf'dan keladigan ctx.chat.id (number) bilan === orqali mos kelmay qoladi -
+  // natijada /toxtat "Faol sessiya yo'q" deydi va javoblar hisoblanmaydi. Shu yerda
+  // bir marta Number()ga o'tkazib, shu yerdan keyin hamma joyda shu son ishlatiladi.
+  const chatId = Number(queueItem.chat_id);
+
   try {
     const topicRes = await db.query('SELECT * FROM topics WHERE id=$1', [queueItem.topic_id]);
     const topic = topicRes.rows[0];
@@ -34,12 +42,12 @@ async function startQueueItem(bot, queueItemId) {
       return false;
     }
 
-    let groupRes = await db.query('SELECT id FROM groups WHERE chat_id=$1', [queueItem.chat_id]);
+    let groupRes = await db.query('SELECT id FROM groups WHERE chat_id=$1', [chatId]);
     let groupId;
     if (groupRes.rows.length === 0) {
       const insertGroup = await db.query(
         'INSERT INTO groups (chat_id, title) VALUES ($1, $2) RETURNING id',
-        [queueItem.chat_id, null]
+        [chatId, null]
       );
       groupId = insertGroup.rows[0].id;
     } else {
@@ -53,7 +61,7 @@ async function startQueueItem(bot, queueItemId) {
     const sessionId = sessionRes.rows[0].id;
 
     await startSession(bot, {
-      chatId: queueItem.chat_id,
+      chatId,
       groupId,
       topicId: topic.id,
       questions,
@@ -77,7 +85,8 @@ async function checkSchedule(bot) {
        WHERE position = 1 AND status = 'pending' AND scheduled_at IS NOT NULL AND scheduled_at <= NOW()`
     );
     for (const item of res.rows) {
-      if (hasActiveSession(item.chat_id)) continue; // guruh band - keyingi tekshiruvda urinib ko'ramiz
+      const chatId = Number(item.chat_id); // bigint -> string muammosi uchun, yuqoridagi izohga qarang
+      if (hasActiveSession(chatId)) continue; // guruh band - keyingi tekshiruvda urinib ko'ramiz
       await startQueueItem(bot, item.id);
     }
   } catch (err) {
