@@ -78,7 +78,13 @@ async function safeDbQuery(text, params) {
   }
 }
 
-async function startSession(bot, { chatId, groupId, topicId, questions, sessionId, queueItemId }) {
+async function startSession(bot, { chatId: rawChatId, groupId, topicId, questions, sessionId, queueItemId }) {
+  // Himoya chorasi: chaqiruvchi qayerdan kelmasin (masalan bazadan BIGINT string
+  // sifatida o'qilgan bo'lsa), bu yerda doim "number"ga o'tkazamiz - aks holda
+  // activeSessions Map kaliti Telegraf'ning ctx.chat.id (number) bilan mos kelmay,
+  // /toxtat va javob hisoblash ishlamay qoladi.
+  const chatId = Number(rawChatId);
+
   if (activeSessions.has(chatId)) {
     await sendHtml(bot, chatId, "Bu guruhda allaqachon faol sessiya bor.");
     return;
@@ -329,7 +335,7 @@ async function handleGroupMessage(ctx) {
 }
 
 async function stopSession(bot, chatId) {
-  const state = activeSessions.get(chatId);
+  const state = activeSessions.get(Number(chatId));
   if (!state) return false;
 
   state.stopped = true;
@@ -338,7 +344,7 @@ async function stopSession(bot, chatId) {
 }
 
 function hasActiveSession(chatId) {
-  return activeSessions.has(chatId);
+  return activeSessions.has(Number(chatId));
 }
 
 module.exports = {
